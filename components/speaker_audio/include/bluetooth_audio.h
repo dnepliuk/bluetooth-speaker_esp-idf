@@ -19,6 +19,14 @@ struct Config {
 esp_err_t begin(const Config& config);
 // Event logs are coalesced and emitted from the application service loop.
 void update();
+struct Status {
+    bool ready;
+    bool connected;
+    bool playing;
+    bool pairing;
+};
+// Read-only indication snapshot; confirmed AVRCP playback, A2DP fallback.
+Status status();
 // Nonblocking request; cancellation and pairing run on the library's event task.
 void enterPairingMode();
 enum class MediaCommand : uint8_t { TogglePlayPause, Previous, Next };

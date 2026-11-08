@@ -38,6 +38,16 @@ dependencies:
       registry_url: https://components.espressif.com
       type: service
     version: 1.3.0
+  espressif/led_strip:
+    component_hash: 027f68f2b57b0dca1d68dff6cc1139d9093825aa808c2bc3ca42bb2ce530fce9
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.2'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 3.1.1
   idf:
     source:
       type: idf
@@ -45,7 +55,8 @@ dependencies:
 direct_dependencies:
 - chill-sam/ssd1306
 - espressif/button
+- espressif/led_strip
 - idf
-manifest_hash: 4902d2783d3646f0abd17b9fe10ae8d761b40a4e9ef9fbae7ebbe514acd9efdd
+manifest_hash: 3a3d322a61e6acf4f7fa1856a09345e5ac57d1a6383884591e51ac5b108073cd
 target: esp32
 version: 3.0.0

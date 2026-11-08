@@ -157,3 +157,13 @@ detents, signed counter wrap, stale session rejection, playback fallback and
 quantization and actual player responses require hardware verification.
 
 See [../../docs/testing.md](../../docs/testing.md) for hardware checks.
+
+## Read-only status for indication
+
+`BluetoothAudio::status()` returns readiness, connection, playback and pairing
+state for the application loop. It copies callback state under the existing
+short critical section; the pending pairing request is atomic. The event task
+publishes its pairing phase after each action, including cancellation failure
+and completion, without exposing library reconnect flags across tasks.
+Playback follows the same confirmed AVRCP/A2DP fallback policy as Play/Pause.
+The LED task receives a value only; it never calls Bluetooth or accesses PCM.

@@ -1,3 +1,4 @@
 dependencies:
-  idf: ">=6.1,<6.2"
-  espressif/button: "==4.2.3"
+  idf: '>=6.1,<6.2'
+  espressif/button: ==4.2.3
+  espressif/led_strip: ==3.1.1

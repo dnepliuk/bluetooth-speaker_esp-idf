@@ -44,10 +44,10 @@ constexpr uint8_t kOledAddress = 0x3C;
 constexpr SpeakerBattery::Calibration kBatteryCalibration{
     150000, 30000, 0.9880f, 0.0f};
 
-// GPIO27 stays LOW until the WS2812 stage.
 constexpr gpio_num_t kStatusLedPin = GPIO_NUM_2;
 constexpr bool kStatusLedActiveHigh = true;
 constexpr gpio_num_t kLedStripPin = GPIO_NUM_27;
+constexpr uint8_t kLedStripBrightness = 48;
 constexpr uint32_t kStatusLedHeartbeatPeriodMs = 1000;
 constexpr uint32_t kStatusLedHeartbeatOnMs = 50;
 constexpr uint32_t kServiceIntervalMs = 10;

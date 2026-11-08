@@ -7,12 +7,14 @@
 #include "button_input.h"
 #include "rotary_input.h"
 #include "status_led.h"
+#include "status_strip.h"
 
 #include "esp_app_desc.h"
 #include "esp_chip_info.h"
 #include "esp_flash.h"
 #include "esp_log.h"
 #include "esp_partition.h"
+#include "esp_private/esp_gpio_reserve.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -66,7 +68,7 @@ void logStartup() {
     esp_chip_info_t chip{};
     esp_chip_info(&chip);
 
-    ESP_LOGI(kTag, "FAITAL_SPEAKER firmware=esp-idf version=%s stage=5", app->version);
+    ESP_LOGI(kTag, "FAITAL_SPEAKER firmware=esp-idf version=%s stage=6", app->version);
     ESP_LOGI(kTag, "ESP-IDF=%s target=%s cores=%d revision=%u.%u",
              esp_get_idf_version(), CONFIG_IDF_TARGET, chip.cores,
              static_cast<unsigned>(chip.revision / 100),
@@ -106,6 +108,16 @@ extern "C" void app_main(void) {
     initializeIdleStripPin();
     logStartup();
     ESP_ERROR_CHECK(StatusLed::begin());
+    // Hand our startup GPIO reservation to RMT. Revoking changes bookkeeping
+    // only: the output stays LOW until RMT connects its signal. No other code
+    // drives this pin. gpio_reset_pin() would disable output and enable pull-up.
+    (void)esp_gpio_revoke(1ULL << AppConfig::kLedStripPin);
+    const esp_err_t stripError = StatusStrip::begin(
+        AppConfig::kLedStripPin, AppConfig::kLedStripBrightness);
+    if (stripError != ESP_OK) {
+        ESP_LOGW(kTag, "WS2812 worker unavailable: %s; continuing without strip",
+                 esp_err_to_name(stripError));
+    }
     const BluetoothAudio::Config audioConfig{
         AppConfig::kBluetoothName,
         AppConfig::kI2sBckPin, AppConfig::kI2sWsPin, AppConfig::kI2sDataPin,
@@ -126,7 +138,7 @@ extern "C" void app_main(void) {
         ESP_LOGW(kTag, "OLED worker unavailable: %s; continuing without display",
                  esp_err_to_name(displayError));
     }
-    ESP_LOGI(kTag, "Stage 5 started: application loop=%" PRIu32 " ms; battery/OLED",
+    ESP_LOGI(kTag, "Stage 6 started: application loop=%" PRIu32 " ms; WS2812/full integration",
              AppConfig::kServiceIntervalMs);
 
     TickType_t lastWake = xTaskGetTickCount();
@@ -137,6 +149,9 @@ extern "C" void app_main(void) {
         ButtonInput::update();
         RotaryInput::update();
         BluetoothAudio::update();
+        const BluetoothAudio::Status bluetooth = BluetoothAudio::status();
+        StatusStrip::setState(StripAnimation::stateFor(
+            bluetooth.ready, bluetooth.connected, bluetooth.playing, bluetooth.pairing));
         if (BatteryMonitor::update(nowUs)) {
             BatteryDisplay::publish(BatteryMonitor::reading());
         }

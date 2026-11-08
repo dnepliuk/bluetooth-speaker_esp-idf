@@ -39,6 +39,7 @@ struct State {
     SpeakerControl::Playback playback = SpeakerControl::Playback::Unknown;
     uint32_t session = 0;
     bool profileReady = false;
+    bool pairing = false;
 } state, reported;
 std::atomic<uint32_t> ignoredPcmBytes{0};
 using SpeakerControl::LinkState;
@@ -144,6 +145,7 @@ public:
     }
 
     void requestPairing() { pairingRequested_.store(true); }
+    bool pairingRequested() const { return pairingRequested_.load(); }
 
     esp_err_t initializeControls() {
         if (controlQueue_ != nullptr) return ESP_ERR_INVALID_STATE;
@@ -605,6 +607,11 @@ private:
                 break;
             case PairingAction::None: break;
         }
+        // Publish the event-task-owned phase, including failed cancellation,
+        // without exposing the mutable pairing policy to the application loop.
+        portENTER_CRITICAL(&stateMux);
+        state.pairing = pairing_.phase() != PairingPhase::Normal;
+        portEXIT_CRITICAL(&stateMux);
     }
 
     SpeakerControl::PairingPolicy pairing_;
@@ -705,6 +712,15 @@ void update() {
                  current.playback == Playback::Seeking ? "seeking" : "unknown (A2DP fallback)");
     }
     reported = current;
+}
+
+Status status() {
+    const State current = currentState();
+    const bool connected = current.connection == ESP_A2D_CONNECTION_STATE_CONNECTED;
+    return {current.profileReady, connected,
+            connected && SpeakerControl::shouldPause(current.playback,
+                current.audio == ESP_A2D_AUDIO_STATE_STARTED),
+            current.pairing || sink().pairingRequested()};
 }
 
 void enterPairingMode() {
