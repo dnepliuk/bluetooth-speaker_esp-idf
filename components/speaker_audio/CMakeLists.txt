@@ -1,0 +1,7 @@
+idf_component_register(
+    SRCS "audio_output.cpp" "bluetooth_audio.cpp"
+    INCLUDE_DIRS "include"
+    PRIV_INCLUDE_DIRS "."
+    REQUIRES esp_common
+    PRIV_REQUIRES esp32_a2dp esp_driver_i2s freertos log nvs_flash esp_timer
+)

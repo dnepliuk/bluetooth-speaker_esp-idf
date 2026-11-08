@@ -1,6 +1,7 @@
 #include <cinttypes>
 
 #include "app_config.h"
+#include "bluetooth_audio.h"
 #include "status_led.h"
 
 #include "esp_app_desc.h"
@@ -61,7 +62,7 @@ void logStartup() {
     esp_chip_info_t chip{};
     esp_chip_info(&chip);
 
-    ESP_LOGI(kTag, "FAITAL_SPEAKER firmware=esp-idf version=%s stage=1", app->version);
+    ESP_LOGI(kTag, "FAITAL_SPEAKER firmware=esp-idf version=%s stage=2", app->version);
     ESP_LOGI(kTag, "ESP-IDF=%s target=%s cores=%d revision=%u.%u",
              esp_get_idf_version(), CONFIG_IDF_TARGET, chip.cores,
              static_cast<unsigned>(chip.revision / 100),
@@ -101,7 +102,12 @@ extern "C" void app_main(void) {
     initializeIdleStripPin();
     logStartup();
     ESP_ERROR_CHECK(StatusLed::begin());
-    ESP_LOGI(kTag, "Stage 1 ready: application loop=%" PRIu32 " ms; Bluetooth/audio pending",
+    const BluetoothAudio::Config audioConfig{
+        AppConfig::kBluetoothName,
+        AppConfig::kI2sBckPin, AppConfig::kI2sWsPin, AppConfig::kI2sDataPin,
+        AppConfig::kInitialSampleRate, AppConfig::kVolumeFallback};
+    ESP_ERROR_CHECK(BluetoothAudio::begin(audioConfig));
+    ESP_LOGI(kTag, "Stage 2 started: application loop=%" PRIu32 " ms; A2DP/I2S/phone volume",
              AppConfig::kServiceIntervalMs);
 
     TickType_t lastWake = xTaskGetTickCount();
@@ -109,6 +115,7 @@ extern "C" void app_main(void) {
     while (true) {
         const int64_t nowUs = esp_timer_get_time();
         StatusLed::update(nowUs);
+        BluetoothAudio::update();
 
         if (nowUs - lastLogUs >= AppConfig::kRuntimeLogIntervalUs) {
             lastLogUs = nowUs;
@@ -116,6 +123,7 @@ extern "C" void app_main(void) {
                      " minimum_heap=%" PRIu32,
                      nowUs / 1000000, esp_get_free_heap_size(),
                      esp_get_minimum_free_heap_size());
+            BluetoothAudio::logStats();
         }
 
         // Block until the next service slot so idle tasks and watchdogs can run.

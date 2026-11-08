@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-set(PROJECT_VER "0.1.0-stage1")
+set(PROJECT_VER "0.2.1-stage2")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(bluetooth-speaker_esp-idf)
 
@@ -9,4 +9,7 @@ if(NOT CONFIG_ESPTOOLPY_FLASHSIZE_4MB)
 endif()
 if(NOT CONFIG_PARTITION_TABLE_CUSTOM)
     message(FATAL_ERROR "This project requires the custom partitions.csv table.")
+endif()
+if(NOT CONFIG_BT_A2DP_ENABLE OR CONFIG_BT_A2DP_USE_EXTERNAL_CODEC)
+    message(FATAL_ERROR "This audio path requires A2DP with the internal SBC decoder.")
 endif()

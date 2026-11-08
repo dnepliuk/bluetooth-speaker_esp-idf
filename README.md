@@ -50,23 +50,55 @@ OLED: SSD1306 128×64, I²C-адреса `0x3C`.
 | Пакет framework | `platformio/framework-espidf@4.60100.0` |
 | Мова застосунку | C++ |
 | UART | 115200 baud |
+| CPU | 240 MHz |
 
-Поточна основа використовує штатні компоненти ESP-IDF: GPIO, FreeRTOS,
-esp_timer, log, esp_system, esp_hw_support, esp_app_format, spi_flash та esp_partition.
+Bluetooth A2DP та AVRCP реалізовані бібліотекою **ESP32-A2DP v1.8.11** —
+тією самою, що в Arduino-еталоні, зібраною як native ESP-IDF component.
+Вбудований SBC-декодер Bluedroid видає PCM; невеликий адаптер передає його
+штатному драйверу `esp_driver_i2s`. Arduino framework і AudioTools не потрібні.
+Нелінійна крива гучності з ESP32-A2DP збережена.
+
+Копія вихідних файлів бібліотеки зафіксована в репозиторії разом із ліцензією.
+Версія, походження та параметри інтеграції описані в
+[components/esp32_a2dp/README.md](components/esp32_a2dp/README.md).
+Інші основні компоненти — GPIO, FreeRTOS, NVS, esp_timer, log, esp_system,
+esp_hw_support, esp_app_format, spi_flash та esp_partition.
+
+## Bluetooth і аудіовихід
+
+Назва пристрою — **Faital Bluetooth Speaker**. Підключення обирають у Bluetooth
+налаштуваннях телефона. Підтримується A2DP з кодеком SBC; гучність телефона
+передається через AVRCP Absolute Volume та застосовується до PCM.
+Діапазон — 0..127, початкове значення до команди телефона — 64.
+
+I2S працює як master у форматі Philips, 16 біт, стерео, з початковою частотою
+44,1 кГц. Частота змінюється відповідно до узгодженого SBC-потоку;
+моно подається однаково в обидва канали. Під час паузи на виході — тиша.
+MCLK не виводиться на GPIO.
+
+Поточна реалізація містить аудіоприймання, керування гучністю з телефона
+та heartbeat. Автоматичне перепідключення, фізичні органи керування,
+вимірювання батареї, OLED і WS2812 додаються поступово.
+Bluetooth-зв'язки зберігаються в NVS; автоматичного очищення NVS немає.
 
 ## Структура та конфігурація
 
 | Файл | Призначення |
 | --- | --- |
 | [platformio.ini](platformio.ini) | Плата, версії пакетів і параметри PlatformIO |
+| [scripts/idf_memory_layout.py](scripts/idf_memory_layout.py) | Оновлення карти пам'яті при змінах конфігурації ESP-IDF |
 | [sdkconfig.defaults](sdkconfig.defaults) | Навмисні налаштування ESP-IDF |
 | [partitions.csv](partitions.csv) | Таблиця розділів flash |
 | [src/app_config.h](src/app_config.h) | GPIO та параметри застосунку |
 | [src/main.cpp](src/main.cpp) | Запуск, діагностика та цикл обслуговування |
 | [src/status_led.cpp](src/status_led.cpp) | Heartbeat головного циклу |
+| [components/speaker_audio](components/speaker_audio) | Інтеграція Bluetooth, PCM-гучності та native I2S |
+| [components/esp32_a2dp](components/esp32_a2dp) | Зафіксована ESP32-A2DP та її CMake-адаптер |
 
 Згенерований `sdkconfig.esp32doit-devkit-v1` відстежується Git;
 його оновлюють інструменти конфігурації та збірки.
+Скрипт PlatformIO додає залежності `memory.ld` від `sdkconfig.h` та `ld.common`,
+щоб резервування пам'яті Bluetooth відповідало поточній конфігурації.
 
 Flash містить NVS 20 KiB з адреси `0x9000`, PHY 4 KiB з `0xF000`
 та factory app 3 MiB з `0x10000`. Решта простору не розмічена.

@@ -1,0 +1,240 @@
+#include "bluetooth_audio.h"
+
+#include <algorithm>
+#include <atomic>
+#include <cinttypes>
+#include <cstring>
+#include "BluetoothA2DPSink.h"
+#include "audio_output.h"
+#include "pcm_volume.h"
+#include "esp_log.h"
+#include "nvs_flash.h"
+#include "sdkconfig.h"
+
+#if !CONFIG_BT_A2DP_ENABLE || !CONFIG_BT_CLASSIC_ENABLED
+#error "Enable Classic Bluetooth and A2DP in sdkconfig.defaults"
+#endif
+#if CONFIG_BT_A2DP_USE_EXTERNAL_CODEC
+#error "This adapter needs the ESP-IDF internal SBC decoder (PCM callback)"
+#endif
+
+namespace {
+constexpr char kTag[] = "BLUETOOTH";
+IdfI2sOutput output;
+PcmVolume volume;
+portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
+struct State {
+    esp_a2d_connection_state_t connection = ESP_A2D_CONNECTION_STATE_DISCONNECTED;
+    esp_a2d_audio_state_t audio = ESP_A2D_AUDIO_STATE_SUSPEND;
+    uint32_t sampleRate = 0;
+    uint8_t channels = 0;
+    int remoteVolume = -1;
+    bool profileReady = false;
+} state, reported;
+std::atomic<uint32_t> ignoredPcmBytes{0};
+
+void onConnection(esp_a2d_connection_state_t connection, void*) {
+    portENTER_CRITICAL(&stateMux);
+    state.connection = connection;
+    if (connection != ESP_A2D_CONNECTION_STATE_CONNECTED) {
+        state.audio = ESP_A2D_AUDIO_STATE_SUSPEND;
+    }
+    if (connection == ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
+        state.sampleRate = 0;
+        state.channels = 0;
+        state.remoteVolume = -1;
+    }
+    portEXIT_CRITICAL(&stateMux);
+}
+
+void onAudio(esp_a2d_audio_state_t audio, void*) {
+    portENTER_CRITICAL(&stateMux);
+    state.audio = audio;
+    portEXIT_CRITICAL(&stateMux);
+}
+
+void onVolume(int level) {
+    portENTER_CRITICAL(&stateMux);
+    state.remoteVolume = level;
+    portEXIT_CRITICAL(&stateMux);
+}
+
+// Keep protocol handling in the upstream library. These overrides adapt its
+// output/error/lifetime policies to this application, without editing upstream.
+class SpeakerSink final : public BluetoothA2DPSink {
+public:
+    explicit SpeakerSink(BluetoothA2DPOutput& target) : BluetoothA2DPSink(target) {
+        s_volume_notify = false;
+    }
+
+protected:
+    void init_nvs() override {
+        // A full/incompatible NVS partition must be diagnosed, never erased here.
+        ESP_ERROR_CHECK(nvs_flash_init());
+    }
+
+    int init_bluetooth() override {
+        const int ok = BluetoothA2DPSink::init_bluetooth();
+        if (!ok) ESP_ERROR_CHECK(ESP_FAIL);
+        return ok;
+    }
+
+    size_t write_audio(const uint8_t* data, size_t size) override {
+        // Upstream i2s_write_data retries forever if an output returns zero.
+        // The native driver reports partial/time-out writes; count/drop once.
+        return output.write(data, size);
+    }
+
+    void handle_connection_state(uint16_t event, void* parameter) override {
+        auto* p = static_cast<esp_a2d_cb_param_t*>(parameter);
+        if (p->conn_stat.state == ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
+            pcmChannels_.store(0);
+            set_i2s_active(false);
+            s_volume_notify = false;
+        }
+        BluetoothA2DPSink::handle_connection_state(event, parameter);
+    }
+
+    void handle_audio_cfg(uint16_t, void* parameter) override {
+        pcmChannels_.store(0);
+        auto* p = static_cast<esp_a2d_cb_param_t*>(parameter);
+        const auto& codec = p->audio_cfg.mcc;
+        uint32_t rate = 0;
+        switch (codec.cie.sbc_info.samp_freq) {
+            case ESP_A2D_SBC_CIE_SF_16K: rate = 16000; break;
+            case ESP_A2D_SBC_CIE_SF_32K: rate = 32000; break;
+            case ESP_A2D_SBC_CIE_SF_44K: rate = 44100; break;
+            case ESP_A2D_SBC_CIE_SF_48K: rate = 48000; break;
+            default: break;
+        }
+        if (codec.type != ESP_A2D_MCT_SBC || rate == 0) {
+            ESP_LOGE(kTag, "Unsupported codec configuration; PCM remains muted");
+            set_i2s_active(false);
+            return;
+        }
+        const uint8_t channels =
+            codec.cie.sbc_info.ch_mode == ESP_A2D_SBC_CIE_CH_MODE_MONO ? 1 : 2;
+        output.set_sample_rate(rate);
+        m_sample_rate = rate;
+        m_channels = channels;
+        audio_type = codec.type;
+        pcmChannels_.store(channels);
+        portENTER_CRITICAL(&stateMux);
+        state.sampleRate = rate;
+        state.channels = channels;
+        portEXIT_CRITICAL(&stateMux);
+    }
+
+    void audio_data_callback(const uint8_t* data, uint32_t len) override {
+        const uint8_t channels = pcmChannels_.load();
+        if (channels == 0 || data == nullptr || len % (channels * 2) != 0) {
+            ignoredPcmBytes.fetch_add(len);
+            return;
+        }
+        if (channels == 2) {
+            BluetoothA2DPSink::audio_data_callback(data, len);
+            return;
+        }
+        // The native decoder can also negotiate mono. Duplicate each sample to
+        // L/R before applying the unchanged stereo volume algorithm.
+        Frame stereo[128];
+        while (len != 0) {
+            const uint32_t frames = std::min<uint32_t>(len / 2, 128);
+            for (uint32_t i = 0; i < frames; ++i) {
+                int16_t sample;
+                std::memcpy(&sample, data + i * 2, sizeof(sample));
+                stereo[i] = Frame(sample, sample);
+            }
+            BluetoothA2DPSink::audio_data_callback(
+                reinterpret_cast<const uint8_t*>(stereo), frames * sizeof(Frame));
+            data += frames * 2;
+            len -= frames * 2;
+        }
+    }
+
+    void av_hdl_a2d_evt(uint16_t event, void* parameter) override {
+        BluetoothA2DPSink::av_hdl_a2d_evt(event, parameter);
+        if (event == ESP_A2D_PROF_STATE_EVT) {
+            auto* p = static_cast<esp_a2d_cb_param_t*>(parameter);
+            portENTER_CRITICAL(&stateMux);
+            state.profileReady = p->a2d_prof_stat.init_state == ESP_A2D_INIT_SUCCESS;
+            portEXIT_CRITICAL(&stateMux);
+        }
+    }
+
+private:
+    std::atomic<uint8_t> pcmChannels_{0};
+};
+
+SpeakerSink& sink() {
+    static SpeakerSink instance(output);
+    return instance;
+}
+}  // namespace
+
+namespace BluetoothAudio {
+esp_err_t begin(const Config& config) {
+    if (config.deviceName == nullptr || config.initialVolume > 127) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    const esp_err_t nvs = nvs_flash_init();
+    if (nvs != ESP_OK) {
+        ESP_LOGE(kTag, "NVS init failed: %s; existing data has been preserved",
+                 esp_err_to_name(nvs));
+        return nvs;
+    }
+    const esp_err_t i2s = output.initialize(config);
+    if (i2s != ESP_OK) return i2s;
+
+    // Keep upstream informational logging out of the PCM callback path.
+    esp_log_level_set("BT_AV", ESP_LOG_WARN);
+    esp_log_level_set("RCCT", ESP_LOG_WARN);
+    esp_log_level_set("BT_API", ESP_LOG_WARN);
+    auto& a2dp = sink();
+    a2dp.set_volume_control(&volume);
+    a2dp.set_volume(config.initialVolume);
+    a2dp.set_on_volumechange(onVolume);
+    a2dp.set_on_connection_state_changed(onConnection);
+    a2dp.set_on_audio_state_changed(onAudio);
+    a2dp.set_default_bt_mode(ESP_BT_MODE_CLASSIC_BT);
+    a2dp.set_auto_reconnect(false);
+    a2dp.set_event_stack_size(4096);
+    a2dp.set_avrc_metadata_attribute_mask(0);
+    a2dp.start(config.deviceName);
+    ESP_LOGI(kTag, "Starting '%s'; phone volume=0..127, fallback=%u; reconnect disabled",
+             config.deviceName, static_cast<unsigned>(config.initialVolume));
+    return ESP_OK;
+}
+
+void update() {
+    portENTER_CRITICAL(&stateMux);
+    const State current = state;
+    portEXIT_CRITICAL(&stateMux);
+    if (current.profileReady && !reported.profileReady) {
+        ESP_LOGI(kTag, "A2DP ready: discoverable, waiting for phone connection");
+    }
+    if (current.connection != reported.connection) {
+        ESP_LOGI(kTag, "Connection: %s",
+                 sink().to_str(current.connection));
+    }
+    if (current.sampleRate != 0 &&
+        (current.sampleRate != reported.sampleRate || current.channels != reported.channels)) {
+        ESP_LOGI(kTag, "SBC negotiated: %" PRIu32 " Hz, %u channel(s); I2S s16 stereo",
+                 current.sampleRate, static_cast<unsigned>(current.channels));
+    }
+    if (current.audio != reported.audio) {
+        ESP_LOGI(kTag, "Audio: %s",
+                 current.audio == ESP_A2D_AUDIO_STATE_STARTED ? "started" : "suspended");
+    }
+    if (current.remoteVolume >= 0 && current.remoteVolume != reported.remoteVolume) {
+        ESP_LOGI(kTag, "Phone volume: %d/127", current.remoteVolume);
+    }
+    reported = current;
+}
+
+void logStats() {
+    output.logStats();
+    const uint32_t ignored = ignoredPcmBytes.load();
+    if (ignored != 0) ESP_LOGW(kTag, "PCM ignored before valid format: %" PRIu32 " bytes", ignored);
+}
+}  // namespace BluetoothAudio

@@ -10,8 +10,10 @@ constexpr char kBluetoothName[] = "Faital Bluetooth Speaker";
 constexpr uint32_t kSerialBaud = 115200;
 constexpr uint32_t kExpectedFlashBytes = 4U * 1024U * 1024U;
 constexpr uint32_t kApplicationPartitionBytes = 3U * 1024U * 1024U;
+constexpr uint32_t kInitialSampleRate = 44100;
+constexpr uint8_t kVolumeFallback = 64;
 
-// Fixed wiring from the working reference; later stages initialize these pins.
+// Fixed wiring from the working reference.
 constexpr gpio_num_t kI2sBckPin = GPIO_NUM_26;
 constexpr gpio_num_t kI2sWsPin = GPIO_NUM_25;
 constexpr gpio_num_t kI2sDataPin = GPIO_NUM_19;
@@ -25,7 +27,7 @@ constexpr gpio_num_t kBatteryAdcPin = GPIO_NUM_34;
 constexpr gpio_num_t kOledSdaPin = GPIO_NUM_21;
 constexpr gpio_num_t kOledSclPin = GPIO_NUM_22;
 
-// Only these two outputs are configured in stage 1.
+// GPIO27 stays LOW until the WS2812 stage.
 constexpr gpio_num_t kStatusLedPin = GPIO_NUM_2;
 constexpr bool kStatusLedActiveHigh = true;
 constexpr gpio_num_t kLedStripPin = GPIO_NUM_27;

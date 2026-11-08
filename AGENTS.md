@@ -23,7 +23,8 @@
 - Stage 1 pins PlatformIO platform `espressif32@7.1.3` and `platformio/framework-espidf@4.60100.0` (ESP-IDF 6.1.0). Preserve these versions unless a later task explicitly requires a justified change.
 - The Arduino reference uses Arduino-ESP32 2.0.17 / ESP-IDF 4.4.7, ESP32-A2DP v1.8.11 and AudioTools v1.2.5. Read its `dependencies.lock` and installed implementation when reproducing library behavior.
 - Consult official Espressif documentation and local headers/examples matching the selected IDF version and ESP32 target. Do not mix IDF 4.x, 5.x and 6.x APIs.
-- Stage 1 implements startup diagnostics and GPIO2 heartbeat with Bluetooth/audio still pending. Flash is configured for 4 MiB with a 3 MiB factory application in `partitions.csv`; startup reports the physically detected flash size. Intentional values are in `sdkconfig.defaults`; the generated `sdkconfig.esp32doit-devkit-v1` remains tracked. Hardware acceptance is pending.
+- Stage 1 passed hardware validation (stable heap/heartbeat, reset and cold boot) and was committed by the user. Stage 2 integrates ESP32-A2DP v1.8.11 in native mode with the internal SBC decoder, AVRCP phone volume and an `esp_driver_i2s` adapter; hardware audio acceptance is pending. Auto-reconnect is disabled until stage 3. Flash remains 4 MiB with a 3 MiB factory application. Intentional values are in `sdkconfig.defaults`; generated `sdkconfig.esp32doit-devkit-v1` remains tracked.
+- Keep `components/esp32_a2dp/upstream` unchanged; its sources are pinned to the reference's upstream commit. Build adaptation lives in its parent CMakeLists; product adaptation lives in `components/speaker_audio`. See the component README for provenance and the scoped overrides for NVS, PCM format handling and bounded writes.
 
 Build from PowerShell after implementation changes are authorized:
 
