@@ -1,0 +1,40 @@
+#pragma once
+
+#include <cstdint>
+
+#include "driver/gpio.h"
+
+namespace AppConfig {
+
+constexpr char kBluetoothName[] = "Faital Bluetooth Speaker";
+constexpr uint32_t kSerialBaud = 115200;
+constexpr uint32_t kExpectedFlashBytes = 4U * 1024U * 1024U;
+constexpr uint32_t kApplicationPartitionBytes = 3U * 1024U * 1024U;
+
+// Fixed wiring from the working reference; later stages initialize these pins.
+constexpr gpio_num_t kI2sBckPin = GPIO_NUM_26;
+constexpr gpio_num_t kI2sWsPin = GPIO_NUM_25;
+constexpr gpio_num_t kI2sDataPin = GPIO_NUM_19;
+constexpr gpio_num_t kEncoderAPin = GPIO_NUM_32;
+constexpr gpio_num_t kEncoderBPin = GPIO_NUM_33;
+constexpr gpio_num_t kEncoderSwitchPin = GPIO_NUM_18;
+constexpr gpio_num_t kPreviousButtonPin = GPIO_NUM_13;
+constexpr gpio_num_t kNextButtonPin = GPIO_NUM_14;
+constexpr gpio_num_t kBluetoothButtonPin = GPIO_NUM_23;
+constexpr gpio_num_t kBatteryAdcPin = GPIO_NUM_34;
+constexpr gpio_num_t kOledSdaPin = GPIO_NUM_21;
+constexpr gpio_num_t kOledSclPin = GPIO_NUM_22;
+
+// Only these two outputs are configured in stage 1.
+constexpr gpio_num_t kStatusLedPin = GPIO_NUM_2;
+constexpr bool kStatusLedActiveHigh = true;
+constexpr gpio_num_t kLedStripPin = GPIO_NUM_27;
+constexpr uint32_t kStatusLedHeartbeatPeriodMs = 1000;
+constexpr uint32_t kStatusLedHeartbeatOnMs = 50;
+constexpr uint32_t kServiceIntervalMs = 10;
+constexpr int64_t kRuntimeLogIntervalUs = 10LL * 1000LL * 1000LL;
+
+static_assert(kStatusLedHeartbeatOnMs < kStatusLedHeartbeatPeriodMs);
+static_assert(kStatusLedHeartbeatOnMs % kServiceIntervalMs == 0);
+
+}  // namespace AppConfig

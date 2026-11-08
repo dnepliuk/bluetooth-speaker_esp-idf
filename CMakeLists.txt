@@ -1,3 +1,12 @@
-cmake_minimum_required(VERSION 3.16.0)
+cmake_minimum_required(VERSION 3.22)
+
+set(PROJECT_VER "0.1.0-stage1")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(bluetooth-speaker_esp-idf)
+
+if(NOT CONFIG_ESPTOOLPY_FLASHSIZE_4MB)
+    message(FATAL_ERROR "This board requires a 4 MB flash configuration; check sdkconfig.defaults and the effective sdkconfig.")
+endif()
+if(NOT CONFIG_PARTITION_TABLE_CUSTOM)
+    message(FATAL_ERROR "This project requires the custom partitions.csv table.")
+endif()

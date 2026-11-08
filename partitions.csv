@@ -1,0 +1,7 @@
+# 4 MiB flash: one 3 MiB factory app, no OTA or filesystem in this stage.
+# Keep the reference Arduino NVS region at 0x9000..0xDFFF.
+# 0xE000..0xEFFF and 0x310000..0x3FFFFF remain unallocated.
+# Name,    Type, SubType, Offset,   Size,     Flags
+nvs,       data, nvs,     0x9000,   0x5000,
+phy_init,  data, phy,     0xF000,   0x1000,
+factory,   app,  factory, 0x10000,  0x300000,

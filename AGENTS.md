@@ -7,15 +7,23 @@
 - Implement changes in this ESP-IDF project. Preserve unrelated existing work. Keep changes within the user's current request; preparing instructions or analyzing the project does not authorize implementing or flashing firmware.
 - Use native ESP-IDF APIs without Arduino as a component. C++ is acceptable and useful for preserving the existing module boundaries; use an `extern "C"` entry point for `app_main` when implemented in C++.
 
+## Staged delivery
+
+- Implement only the current agreed migration stage. Build and provide a short hardware test procedure, then wait for the user's test result.
+- Fix failures within the current stage. Move to the next stage only after the user confirms hardware acceptance and their commit. The user makes commits; do not commit automatically.
+- Stage order: (1) startup/configuration/heartbeat; (2) A2DP, I2S and phone volume; (3) reconnect and pairing button; (4) encoder and media buttons; (5) battery/OLED; (6) WS2812 and full regression.
+- Keep `README.md` focused on the project: purpose, hardware, architecture, dependencies, configuration and general build/use instructions. Put per-stage test procedures, expected logs and acceptance results in `docs/testing.md` or the chat.
+- Follow `docs/testing.md` for the current stage and acceptance checks. Compile success is separate from hardware PASS.
+
 ## Skills and toolchain
 
 - Use [esp-idf](C:/Users/1dima/.codex/skills/esp-idf/SKILL.md) for ESP-IDF configuration, implementation, build failures and runtime diagnostics.
 - Use [esp-idf-components](C:/Users/1dima/.codex/skills/esp-idf-components/SKILL.md) when adding components, selecting dependencies, or changing manifests and component CMake files.
 - This repository uses PlatformIO, environment `esp32doit-devkit-v1`, board `esp32doit-devkit-v1`, target `esp32`, framework `espidf`. Prefer this established workflow over introducing a second SDK installation or replacing PlatformIO.
-- The setup inspected on 2026-11-07 resolves to PlatformIO platform `espressif32 7.1.3` and ESP-IDF `6.1.0`. These are observed versions, not yet fully pinned project requirements: `platformio.ini` currently uses an unversioned platform. Verify resolution and pin the chosen versions during implementation.
+- Stage 1 pins PlatformIO platform `espressif32@7.1.3` and `platformio/framework-espidf@4.60100.0` (ESP-IDF 6.1.0). Preserve these versions unless a later task explicitly requires a justified change.
 - The Arduino reference uses Arduino-ESP32 2.0.17 / ESP-IDF 4.4.7, ESP32-A2DP v1.8.11 and AudioTools v1.2.5. Read its `dependencies.lock` and installed implementation when reproducing library behavior.
 - Consult official Espressif documentation and local headers/examples matching the selected IDF version and ESP32 target. Do not mix IDF 4.x, 5.x and 6.x APIs.
-- Initial scaffold state: empty `src/main.c`; Bluetooth disabled; generated sdkconfig selects 2 MB flash, while the PlatformIO board definition specifies 4 MB. Reconcile the board/flash assumptions and application partition size before producing a flashable firmware. The Arduino reference uses `huge_app.csv`; do not assume the default ESP-IDF app partition is sufficient.
+- Stage 1 implements startup diagnostics and GPIO2 heartbeat with Bluetooth/audio still pending. Flash is configured for 4 MiB with a 3 MiB factory application in `partitions.csv`; startup reports the physically detected flash size. Intentional values are in `sdkconfig.defaults`; the generated `sdkconfig.esp32doit-devkit-v1` remains tracked. Hardware acceptance is pending.
 
 Build from PowerShell after implementation changes are authorized:
 
@@ -84,4 +92,3 @@ Use the reference's current source code as the behavioral baseline. Its README c
 - Validate on hardware only when authorized and after identifying the intended board and port. Do not flash, erase, or alter eFuses merely because a device is connected.
 - Hardware acceptance covers audio at negotiated rates, pause/resume, volume at both endpoints, all buttons, reconnect after power cycle and link loss, manual switching between phones, and concurrent OLED/WS2812 updates without audio dropouts or reboots. Also check battery calibration/low/invalid states and operation with OLED absent.
 - Report the exact environment, checks and limitations. A successful build is not proof of audio quality or hardware behavior. Keep Arduino-reference verification read-only.
-

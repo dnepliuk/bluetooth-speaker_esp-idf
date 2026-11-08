@@ -1,6 +1,15 @@
-# This file was automatically generated for projects
-# without default 'CMakeLists.txt' file.
-
-FILE(GLOB_RECURSE app_sources ${CMAKE_SOURCE_DIR}/src/*.*)
-
-idf_component_register(SRCS ${app_sources})
+idf_component_register(
+    SRCS "main.cpp" "status_led.cpp"
+    INCLUDE_DIRS "."
+    PRIV_REQUIRES
+        esp_app_format
+        esp_common
+        esp_driver_gpio
+        esp_hw_support
+        esp_partition
+        esp_system
+        esp_timer
+        freertos
+        log
+        spi_flash
+)
