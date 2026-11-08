@@ -61,6 +61,10 @@ Bluetooth A2DP та AVRCP реалізовані бібліотекою **ESP32-
 Копія вихідних файлів бібліотеки зафіксована в репозиторії разом із ліцензією.
 Версія, походження та параметри інтеграції описані в
 [components/esp32_a2dp/README.md](components/esp32_a2dp/README.md).
+GPIO-кнопку обслуговує native компонент
+[espressif/button 4.2.3](https://components.espressif.com/components/espressif/button/versions/4.2.3).
+Component Manager завантажує його за `src/idf_component.yml`; точні версії,
+включно з допоміжним `espressif/cmake_utilities`, зафіксовані в `dependencies.lock`.
 Інші основні компоненти — GPIO, FreeRTOS, NVS, esp_timer, log, esp_system,
 esp_hw_support, esp_app_format, spi_flash та esp_partition.
 
@@ -76,8 +80,19 @@ I2S працює як master у форматі Philips, 16 біт, стерео,
 моно подається однаково в обидва канали. Під час паузи на виході — тиша.
 MCLK не виводиться на GPIO.
 
-Поточна реалізація містить аудіоприймання, керування гучністю з телефона
-та heartbeat. Автоматичне перепідключення, фізичні органи керування,
+Після запуску колонка намагається підключитися до останнього телефона.
+При неочікуваній втраті зв'язку також виконує до п'яти спроб; якщо вони
+не вдалися — залишається доступною для підключення з телефона.
+Навмисне від'єднання через Bluetooth-меню телефона не запускає повторні спроби.
+
+Коротке натискання й відпускання кнопки **Bluetooth на GPIO23** вмикає
+ручне парування: зупиняє повторні вихідні спроби, завершує поточне з'єднання
+та відкриває колонку для підключення. Останній підключений телефон
+запам'ятовується для наступних запусків. Довге утримання не має окремої дії.
+Раніше спарений телефон також може сам підключитися в цьому режимі.
+
+Поточна реалізація містить аудіоприймання, керування гучністю з телефона,
+перепідключення, кнопку Bluetooth та heartbeat. Енкодер, медіакнопки,
 вимірювання батареї, OLED і WS2812 додаються поступово.
 Bluetooth-зв'язки зберігаються в NVS; автоматичного очищення NVS немає.
 
@@ -92,6 +107,9 @@ Bluetooth-зв'язки зберігаються в NVS; автоматично�
 | [src/app_config.h](src/app_config.h) | GPIO та параметри застосунку |
 | [src/main.cpp](src/main.cpp) | Запуск, діагностика та цикл обслуговування |
 | [src/status_led.cpp](src/status_led.cpp) | Heartbeat головного циклу |
+| [src/pairing_button.cpp](src/pairing_button.cpp) | GPIO23 через компонент кнопок Espressif |
+| [src/idf_component.yml](src/idf_component.yml) | Залежності ESP Component Registry |
+| [dependencies.lock](dependencies.lock) | Версії й хеші завантажених компонентів |
 | [components/speaker_audio](components/speaker_audio) | Інтеграція Bluetooth, PCM-гучності та native I2S |
 | [components/esp32_a2dp](components/esp32_a2dp) | Зафіксована ESP32-A2DP та її CMake-адаптер |
 

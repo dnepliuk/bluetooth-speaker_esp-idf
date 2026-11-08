@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-set(PROJECT_VER "0.2.1-stage2")
+set(PROJECT_VER "0.3.1-stage3")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(bluetooth-speaker_esp-idf)
 

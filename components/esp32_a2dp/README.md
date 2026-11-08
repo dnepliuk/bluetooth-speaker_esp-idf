@@ -42,6 +42,12 @@ Product-specific adaptations belong in [../speaker_audio](../speaker_audio):
 - Decode the IDF 6.1 SBC format fields; duplicate mono PCM to stereo if negotiated.
 - Publish volume atomically and evaluate upstream's unchanged gain/sample scaling
   on the PCM task, avoiding shared mutable gain state between AVRCP and audio.
+- Serialize manual pairing with the existing control-event queue, suppress
+  outgoing retries during pairing and rearm them after a successful connection.
+- Defer the startup reconnect request until the A2DP profile reports successful
+  initialization; the init API's return only confirms that initialization was queued.
+- Treat an IDF 6.1 failed outgoing OPEN as retryable even when its reported
+  disconnect reason is NORMAL; preserve real intentional disconnection reasons.
 
 No new PCM queue, writer task, codec, resampler or Bluetooth stack is implemented.
 The library's existing control task and ESP-IDF's BTC thread remain in use.

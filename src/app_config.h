@@ -12,6 +12,9 @@ constexpr uint32_t kExpectedFlashBytes = 4U * 1024U * 1024U;
 constexpr uint32_t kApplicationPartitionBytes = 3U * 1024U * 1024U;
 constexpr uint32_t kInitialSampleRate = 44100;
 constexpr uint8_t kVolumeFallback = 64;
+constexpr uint8_t kReconnectAttempts = 5;
+constexpr unsigned kButtonDebounceMs = 40;
+constexpr unsigned kButtonLongPressMs = 800;
 
 // Fixed wiring from the working reference.
 constexpr gpio_num_t kI2sBckPin = GPIO_NUM_26;

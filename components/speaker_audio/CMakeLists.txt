@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "audio_output.cpp" "bluetooth_audio.cpp"
+    SRCS "audio_output.cpp" "bluetooth_audio.cpp" "tests/pairing_policy_test.cpp"
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "."
     REQUIRES esp_common
