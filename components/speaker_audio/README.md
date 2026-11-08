@@ -84,11 +84,76 @@ reset and audio still need hardware.
 
 The native GPIO driver is `espressif/button` 4.2.3 (Apache-2.0), selected from
 the Component Registry instead of porting Arduino's OneButton. A 10 ms scan and
-four debounce samples preserve the 40 ms setting. `src/pairing_button.cpp`
+four debounce samples preserve the 40 ms setting. `src/button_input.cpp`
 handles debounced PRESS_UP, ignoring holds longer than 800 ms: OneButton 2.6.1
 with only `attachClick` does not wait its default 400 ms multi-click window.
 Native SINGLE_CLICK would add an unnecessary wait. The native timer callback
-only publishes an atomic flag; the application loop requests pairing. GPIO23
-has an internal pull-up; low-power wake/hold-repeat behavior is not enabled.
+only publishes an atomic bit per button; the application loop submits controls.
+GPIO23 requests pairing, GPIO18 Play/Pause, GPIO13 Previous and GPIO14 Next.
+All four inputs use internal pull-ups and the same short-release policy.
+
+## Encoder and media control
+
+`src/rotary_input.cpp` uses ESP-IDF 6.1's `esp_driver_pcnt`. One channel counts
+both edges of GPIO32, using GPIO33 as its direction input. Rising decreases,
+falling increases, HIGH direction inverts the count: exactly the reference's
+ESP32Encoder half-quadrature configuration. Internal pull-ups and a 12788 ns
+filter preserve its 1023 APB-cycle setting at 80 MHz. The driver's accumulator
+and +/-30000 watch points extend the hardware counter. `rotary_steps.h` retains
+partial detents, handles reversal, and does not clear the live counter while
+polling. Two counts make one detent; each detent changes volume by four.
+
+The Registry's [espressif/knob](https://components.espressif.com/components/espressif/knob/versions/1.1.0/readme)
+was considered. It uses software quadrature decoding; the built-in hardware
+[PCNT driver](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/pcnt.html)
+preserves the existing counter behavior and already provides allocation,
+interrupt handling, filtering and overflow accumulation. ESP32Encoder itself
+depends on Arduino and the legacy PCNT API, so only its configuration is reused.
+
+`adjustVolume(delta)` and `requestMedia(command)` enqueue at most 12 requests
+with zero waiting and no per-request allocation. They are processed on the
+existing ESP32-A2DP event task, serialized with phone volume and connection
+events. Local changes use the latest library volume, clamp to 0..127, and call
+its `set_volume`, retaining PCM gain and AVRCP Target notifications. The
+notification flag is consumed after a local CHANGED response; the peer's next
+REGISTER_NOTIFICATION receives an INTERIM with the latest level. The flag is
+also cleared on Target disconnect. Hosts without absolute-volume subscriptions
+still get local audible gain changes but may not update their volume indicator.
+
+Each request carries a connection generation. Disconnected input is discarded;
+disconnect or manual pairing invalidates queued requests. A full queue drops
+new input and reports a rate-limited warning. Pairing has priority over media.
+This small queue contains controls only, not PCM, and adds no task.
+
+The library's `play`, `pause`, `previous` and `next` methods still select AVRCP
+commands. The adapter overrides only their transport timing: press is sent
+immediately, release at least 100 ms later, serviced from the main loop via
+zero-wait work items in the existing event queue. Both tasks stay unblocked.
+Only one key is held at a time. Labels 5..15 avoid the library's metadata and
+notification labels 0..4. A failed release is retried every 100 ms while the
+same connection remains active; it is never sent to a new peer.
+
+`MEDIA: AVRCP TX` records local SDK queue acceptance for both press and release,
+including command and transaction label. `MEDIA: AVRCP RX` records the peer's
+actual passthrough response with the same label: accepted (0x09), rejected
+(0x0a), not implemented (0x08), or another raw response code. Even accepted
+does not confirm a track or playback change; check the player and playback
+notifications. Feature and notification-capability masks are logged once per
+received discovery event. These diagnostics run on the existing event task;
+upstream PCM-path logging remains suppressed. Version 0.4.1 adds diagnostics
+for the failed iPhone / YouTube Music button test without changing transport
+timing, labels, key codes, or playback selection.
+
+Play/Pause follows the peer's confirmed AVRCP playback notification, including
+pause while an A2DP stream remains active. Where no valid notification is
+available, it uses confirmed A2DP audio state as in the Arduino reference.
+Sending a command does not optimistically change playback state. The existing
+library owns notification capability discovery and resubscription.
+
+Compile-time checks in `tests/control_policy_test.cpp` and
+`src/tests/rotary_steps_test.cpp` cover volume limits, direction, fractional
+detents, signed counter wrap, stale session rejection, playback fallback and
+100 ms release timing. PCNT pin direction, mechanical bounce, phone volume
+quantization and actual player responses require hardware verification.
 
 See [../../docs/testing.md](../../docs/testing.md) for hardware checks.

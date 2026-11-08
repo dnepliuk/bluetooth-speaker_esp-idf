@@ -2,7 +2,7 @@
 
 #include "esp_err.h"
 
-namespace PairingButton {
+namespace ButtonInput {
 esp_err_t begin();
 void update();
-}  // namespace PairingButton
+}

@@ -21,6 +21,11 @@ esp_err_t begin(const Config& config);
 void update();
 // Nonblocking request; cancellation and pairing run on the library's event task.
 void enterPairingMode();
+enum class MediaCommand : uint8_t { TogglePlayPause, Previous, Next };
+// Called by the main loop. Requests are bounded, nonblocking and scoped to
+// the current connection; disconnected input is discarded, never replayed.
+void requestMedia(MediaCommand command);
+void adjustVolume(int delta);
 void logStats();
 
 }  // namespace BluetoothAudio

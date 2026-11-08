@@ -4,6 +4,10 @@
 
 #include "driver/gpio.h"
 
+#ifndef ENCODER_REVERSED
+#define ENCODER_REVERSED false
+#endif
+
 namespace AppConfig {
 
 constexpr char kBluetoothName[] = "Faital Bluetooth Speaker";
@@ -12,6 +16,12 @@ constexpr uint32_t kExpectedFlashBytes = 4U * 1024U * 1024U;
 constexpr uint32_t kApplicationPartitionBytes = 3U * 1024U * 1024U;
 constexpr uint32_t kInitialSampleRate = 44100;
 constexpr uint8_t kVolumeFallback = 64;
+constexpr int kVolumeStep = 4;
+constexpr int kEncoderCountsPerDetent = 2;
+constexpr bool kEncoderReversed = ENCODER_REVERSED;
+// Original 1023 APB cycles at 80 MHz = 12787.5 ns. Round up; the IDF
+// driver converts 12788 ns back to exactly 1023 hardware filter cycles.
+constexpr uint32_t kEncoderGlitchNs = 12788;
 constexpr uint8_t kReconnectAttempts = 5;
 constexpr unsigned kButtonDebounceMs = 40;
 constexpr unsigned kButtonLongPressMs = 800;

@@ -48,6 +48,10 @@ Product-specific adaptations belong in [../speaker_audio](../speaker_audio):
   initialization; the init API's return only confirms that initialization was queued.
 - Treat an IDF 6.1 failed outgoing OPEN as retryable even when its reported
   disconnect reason is NORMAL; preserve real intentional disconnection reasons.
+- Apply local encoder volume on the library's event task alongside remote
+  volume events; consume each one-shot Target volume notification.
+- Keep the library's media command selection and replace its blocking 100 ms
+  press/release wait with scheduled, connection-scoped release handling.
 
 No new PCM queue, writer task, codec, resampler or Bluetooth stack is implemented.
 The library's existing control task and ESP-IDF's BTC thread remain in use.
