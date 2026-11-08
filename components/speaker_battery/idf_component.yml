@@ -1,0 +1,5 @@
+dependencies:
+  idf: '>=6.1,<6.2'
+  chill-sam/ssd1306:
+    git: https://github.com/Chill-Sam/esp-ssd1306.git
+    version: d95eaac62a8fc697b0a63cc001ae3dfca48aee66

@@ -1,6 +1,8 @@
 #include <cinttypes>
 
 #include "app_config.h"
+#include "battery_monitor.h"
+#include "battery_display.h"
 #include "bluetooth_audio.h"
 #include "button_input.h"
 #include "rotary_input.h"
@@ -64,7 +66,7 @@ void logStartup() {
     esp_chip_info_t chip{};
     esp_chip_info(&chip);
 
-    ESP_LOGI(kTag, "FAITAL_SPEAKER firmware=esp-idf version=%s stage=4", app->version);
+    ESP_LOGI(kTag, "FAITAL_SPEAKER firmware=esp-idf version=%s stage=5", app->version);
     ESP_LOGI(kTag, "ESP-IDF=%s target=%s cores=%d revision=%u.%u",
              esp_get_idf_version(), CONFIG_IDF_TARGET, chip.cores,
              static_cast<unsigned>(chip.revision / 100),
@@ -112,7 +114,19 @@ extern "C" void app_main(void) {
     ESP_ERROR_CHECK(BluetoothAudio::begin(audioConfig));
     ESP_ERROR_CHECK(ButtonInput::begin());
     ESP_ERROR_CHECK(RotaryInput::begin());
-    ESP_LOGI(kTag, "Stage 4 started: application loop=%" PRIu32 " ms; encoder/media buttons",
+    const esp_err_t batteryError = BatteryMonitor::begin(
+        AppConfig::kBatteryAdcPin, AppConfig::kBatteryCalibration);
+    if (batteryError != ESP_OK) {
+        ESP_LOGW(kTag, "Battery initialization failed: %s; measurement remains invalid",
+                 esp_err_to_name(batteryError));
+    }
+    const esp_err_t displayError = BatteryDisplay::begin(
+        AppConfig::kOledSdaPin, AppConfig::kOledSclPin, AppConfig::kOledAddress);
+    if (displayError != ESP_OK) {
+        ESP_LOGW(kTag, "OLED worker unavailable: %s; continuing without display",
+                 esp_err_to_name(displayError));
+    }
+    ESP_LOGI(kTag, "Stage 5 started: application loop=%" PRIu32 " ms; battery/OLED",
              AppConfig::kServiceIntervalMs);
 
     TickType_t lastWake = xTaskGetTickCount();
@@ -123,6 +137,9 @@ extern "C" void app_main(void) {
         ButtonInput::update();
         RotaryInput::update();
         BluetoothAudio::update();
+        if (BatteryMonitor::update(nowUs)) {
+            BatteryDisplay::publish(BatteryMonitor::reading());
+        }
 
         if (nowUs - lastLogUs >= AppConfig::kRuntimeLogIntervalUs) {
             lastLogUs = nowUs;

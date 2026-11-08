@@ -4,6 +4,7 @@ idf_component_register(
     INCLUDE_DIRS "."
     PRIV_REQUIRES
         speaker_audio
+        speaker_battery
         espressif__button
         esp_app_format
         esp_common

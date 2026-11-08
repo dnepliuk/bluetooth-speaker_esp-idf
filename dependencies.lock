@@ -1,4 +1,19 @@
 dependencies:
+  chill-sam/ssd1306:
+    component_hash: 8ef1a1452d0b556c68523daebb89553bfe915d22e590a236a001278f03ba405f
+    dependencies:
+    - name: idf
+      version: '>=5.3'
+    source:
+      git: https://github.com/Chill-Sam/esp-ssd1306.git
+      path: .
+      type: git
+    targets:
+    - esp32
+    - esp32s2
+    - esp32s3
+    - esp32c3
+    version: d95eaac62a8fc697b0a63cc001ae3dfca48aee66
   espressif/button:
     component_hash: 26345e8700d3c6435925f9a8f246d224f9c1b99f937c243fe400844eec514b4a
     dependencies:
@@ -28,8 +43,9 @@ dependencies:
       type: idf
     version: 6.1.0
 direct_dependencies:
+- chill-sam/ssd1306
 - espressif/button
 - idf
-manifest_hash: a575260bdce2665ff1b7cf47331a0b982b0dd96c377d001b303c8aea1a93c6c2
+manifest_hash: 4902d2783d3646f0abd17b9fe10ae8d761b40a4e9ef9fbae7ebbe514acd9efdd
 target: esp32
 version: 3.0.0

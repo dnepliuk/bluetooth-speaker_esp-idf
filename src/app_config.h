@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "driver/gpio.h"
+#include "battery_types.h"
 
 #ifndef ENCODER_REVERSED
 #define ENCODER_REVERSED false
@@ -39,6 +40,9 @@ constexpr gpio_num_t kBluetoothButtonPin = GPIO_NUM_23;
 constexpr gpio_num_t kBatteryAdcPin = GPIO_NUM_34;
 constexpr gpio_num_t kOledSdaPin = GPIO_NUM_21;
 constexpr gpio_num_t kOledSclPin = GPIO_NUM_22;
+constexpr uint8_t kOledAddress = 0x3C;
+constexpr SpeakerBattery::Calibration kBatteryCalibration{
+    150000, 30000, 0.9880f, 0.0f};
 
 // GPIO27 stays LOW until the WS2812 stage.
 constexpr gpio_num_t kStatusLedPin = GPIO_NUM_2;
